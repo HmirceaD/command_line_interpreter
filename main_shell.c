@@ -7,16 +7,16 @@ typedef int bool;
 #define true 1
 #define false 0
 
+
 bool interpretLine(char* buffer){
 
-    if(strcmp(buffer, "exit") == 0){
+    if(strncmp(buffer, "exit", strlen(buffer)-1) == 0){
 
         return false;
 
     } else {
-        printf("I don't know this command\n");
-        return false;
-        printf("%s", buffer);
+
+        printf("I don't know this command, see -help for info\n");
     }
 
     return true;
