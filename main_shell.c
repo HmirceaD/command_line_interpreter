@@ -3,6 +3,10 @@
 #include <stdio.h>
 #include <string.h>
 
+//#include <readline/readline.h>
+//#include <readline/history.h>
+
+
 typedef int bool;
 #define true 1
 #define false 0
@@ -16,6 +20,7 @@ bool interpretLine(char* buffer){
 
     } else {
 
+        //add_history(buffer);
         printf("I don't know this command, see -help for info\n");
     }
 
@@ -33,6 +38,8 @@ char* getLine(){
 
     return buffer;
 
+    free(buffer);
+
 }
 
 /*main loop*/
@@ -40,7 +47,10 @@ void command_loop(){
 
     bool status = true;
     char* line;
+    char** history;
 
+    history = (char**)malloc(sizeof(char*)*50);
+    int index = 0;
 
     while(status){
 
@@ -50,7 +60,21 @@ void command_loop(){
 
     status = interpretLine(line);
 
+        if(status){
+
+            history[index] = (char*)malloc(sizeof(char*));
+
+            history[index] = line;
+
+            index++;
+        }
+
+
     }
+
+    /*HISTORY WORKS*/
+
+    free(line);
 
 }
 
