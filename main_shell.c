@@ -3,14 +3,12 @@
 #include <stdio.h>
 #include <string.h>
 
-//#include <readline/readline.h>
-//#include <readline/history.h>
-
+#include <readline/readline.h>
+#include <readline/history.h>
 
 typedef int bool;
 #define true 1
 #define false 0
-
 
 bool interpretLine(char* buffer){
 
@@ -20,7 +18,6 @@ bool interpretLine(char* buffer){
 
     } else {
 
-        //add_history(buffer);
         printf("I don't know this command, see -help for info\n");
     }
 
@@ -28,8 +25,8 @@ bool interpretLine(char* buffer){
 
 }
 
-/*simple function to read the lines written in the prompt*/
-char* getLine(){
+/*simple function to read the lines written in the prompt !!!Don't need this since I use readline(), keep this just in case*/
+/*char* getLine(){
 
     char *buffer = NULL;
     ssize_t buffSize = 0;
@@ -40,39 +37,30 @@ char* getLine(){
 
     free(buffer);
 
-}
+}*/
 
 /*main loop*/
 void command_loop(){
 
     bool status = true;
     char* line;
-    char** history;
-
-    history = (char**)malloc(sizeof(char*)*50);
-    int index = 0;
 
     while(status){
 
-    printf(">_ ");
+        /*implement arrow keys*/
 
-    line = getLine();
+        line = readline(">_");
 
-    status = interpretLine(line);
+        if(strlen(line) != 1){ //empty string
 
-        if(status){
+        add_history(line);
+        status = interpretLine(line);
 
-            history[index] = (char*)malloc(sizeof(char*));
-
-            history[index] = line;
-
-            index++;
         }
-
 
     }
 
-    /*HISTORY WORKS*/
+
 
     free(line);
 
@@ -82,7 +70,6 @@ void command_loop(){
 int main(int argc, char **argv){
 
     printf("\n=========== SHELL ===========\n\n");
-
 
     command_loop();
 
