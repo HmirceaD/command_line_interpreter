@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/wait.h>
+#include <sys/types.h>
 
 #include <readline/readline.h>
 #include <readline/history.h>
@@ -23,21 +24,44 @@ void printHelp(){
 bool interpretLine(char* buffer, char** tokens){
 
 
-    if(strcmp(buffer, univ_commands[0]) == 0){
-        return false;
+    pid_t pid;
 
-    }else if(strcmp(buffer, univ_commands[1]) == 0){
+    pid = fork();
 
-        printHelp();
+    if(pid < 0){
 
-    }else if(execvp(tokens[0], tokens) != -1){
-
-        return true;
-
-    } else {
-
-        printf("I don't know this command, see -help for info\n");
+        perror("Error creating the process");
     }
+
+    if(pid == 0){
+        /*Child*/
+
+        if(strcmp(buffer, univ_commands[0]) == 0){
+            return false;
+
+        }else if(strcmp(buffer, univ_commands[1]) == 0){
+
+            printHelp();
+
+        }else if(execvp(tokens[0], tokens) != -1){
+
+            return true;
+
+        } else {
+
+            printf("I don't know this command, see -help for info\n");
+        }
+
+    }
+
+    if(pid > 0){
+        /*Parent*/
+
+        wait(&pid);
+
+    }
+
+
 
     //free(tokens);
 
