@@ -23,7 +23,6 @@ void printHelp(){
 
 bool interpretLine(char* buffer, char** tokens){
 
-
     pid_t pid;
 
     pid = fork();
@@ -61,26 +60,9 @@ bool interpretLine(char* buffer, char** tokens){
 
     }
 
-
-
-    //free(tokens);
-
     return true;
 
 }
-
-/*simple function to read the lines written in the prompt !!!Don't need this since I use readline(), keep this just in case*/
-/*char* getLine(){
-
-    char *buffer = NULL;
-
-    buffer = readline(">>");
-
-    return buffer;
-
-    free(buffer);
-
-}*/
 
 void parse(char* line, char** arg){
 
@@ -113,8 +95,6 @@ void command_loop(){
 
     while(status){
 
-        /*implement arrow keys*/
-
         line = readline(">>");
 
         parse(line, arguments);
@@ -127,9 +107,6 @@ void command_loop(){
         }
 
     }
-
-
-
 
     free(line);
 
