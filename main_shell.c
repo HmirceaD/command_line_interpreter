@@ -23,6 +23,14 @@ void printHelp(){
 
 bool interpretLine(char* buffer, char** tokens){
 
+    bool ok = true;
+    int teava[2];
+
+    if(pipe(teava) < 0){
+
+        perror("Pipe died");
+    }
+
     pid_t pid;
 
     pid = fork();
@@ -34,9 +42,13 @@ bool interpretLine(char* buffer, char** tokens){
 
     if(pid == 0){
         /*Child*/
+        close(teava[0]);
 
         if(strcmp(buffer, univ_commands[0]) == 0){
-            return false;
+
+            ok = false;
+            write(teava[1], &ok, sizeof(int));
+            close(teava[1]);
 
         }else if(strcmp(buffer, univ_commands[1]) == 0){
 
@@ -44,7 +56,9 @@ bool interpretLine(char* buffer, char** tokens){
 
         }else if(execvp(tokens[0], tokens) != -1){
 
-            return true;
+            ok = true;
+            write(teava[1], &ok, sizeof(int));
+            close(teava[1]);
 
         } else {
 
@@ -57,10 +71,21 @@ bool interpretLine(char* buffer, char** tokens){
         /*Parent*/
 
         wait(&pid);
+        bool conditie;
+        close(teava[1]);
+
+        read(teava[0], &conditie, sizeof(int));
+
+        if(conditie == false){
+
+            return false;
+
+        }else {
+
+            return true;
+        }
 
     }
-
-    return true;
 
 }
 
@@ -91,7 +116,7 @@ void command_loop(){
 
     bool status = true;
     char* line;
-    char* arguments[80];
+    char* arguments[1024];
 
     while(status){
 
