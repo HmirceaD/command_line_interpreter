@@ -122,11 +122,10 @@ void command_loop(){
 
         line = readline(">>");
 
-        parse(line, arguments);
-
-        if(strlen(line) != 1){ //empty string
+        if(strlen(line) != 0){ //empty string
 
         add_history(line);
+        parse(line, arguments);
         status = interpretLine(line, arguments);
 
         }
