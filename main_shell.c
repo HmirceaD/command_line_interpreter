@@ -4,6 +4,8 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <sys/types.h>
+#include <sys/param.h>
+#include <sys/dir.h>
 
 #include <readline/readline.h>
 #include <readline/history.h>
@@ -12,8 +14,16 @@ typedef int bool;
 #define true 1
 #define false 0
 
+extern int alphasort();//from direct.h
+
 //all the supported commands
-char* univ_commands[3] = {"exit", "-help", "cd", NULL};
+char* univ_commands[4] = {"exit", "-help", "cd", "ls", NULL};
+
+//exit - 0
+//-help - 1
+//cd - 2
+//ls -3
+
 
 /**help function**/
 void printHelp(){
@@ -23,14 +33,69 @@ void printHelp(){
 
 }
 
-/**'cd'**/
-int change_dir(char **arg){
 
-    if(arg[3] != NULL || arg[1] == NULL){
+/**Actuall implementation of cd**/
+int cd_func(char **arg){
 
-        printf("\nNot the correct format\n");
+    if(arg[1] == NULL){
+
+        return chdir(getenv("HOME"));
+
+    } else if((strcmp(arg[1], "~") == 0) ||  (strcmp(arg[1], " ") == 0) || (strcmp(arg[1], "") == 0)){
+
+        return chdir(getenv("HOME"));
+
+    } else {
+
+        return chdir(arg[1]);
+    }
+
+}
+
+/*Helper function for the ls*/
+
+/*static int file_select(const struct dirent *temp){
+
+
+    if(strcmp(temp->d_name, ".") == 0 || strcmp(temp->d_name, "..") == 0){
+
+        return false;
+
+    } else {
+
+        return true;
+    }
+
+}*/
+
+/**Implementation of Ls**/
+int ls_func(char **arg){
+
+    char *crr_dir;
+    int count;
+    struct dirent **files;
+
+    char* d = getcwd(crr_dir, sizeof(crr_dir));
+
+    count = scandir(".", &files, NULL, alphasort);
+
+    if(count <= 0){
+
+        printf("\nNo files in the directory");
         return 1;
     }
+
+    printf("\nFiles:\n\n");
+    for(int i = 2; i < count; i++){//starts from 2 so it can skip over "." and ".."
+
+        printf("%s ", files[i]->d_name);
+    }
+
+    printf("\n");
+
+    return 1;
+
+
 
 }
 
@@ -40,7 +105,7 @@ bool interpretLine(char* buffer, char** tokens){
     int result = 0;
 
     //condition on if the loop will keep running
-    bool ok = true;
+    int ok = true;
 
     //pipe
     int teava[2];
@@ -81,8 +146,20 @@ bool interpretLine(char* buffer, char** tokens){
 
         }else if(strcmp(tokens[0], univ_commands[2]) == 0){
 
-            result = change_dir(tokens);
+            /*cd*/
+            /*correct syntax*/
+            ok = 2;
+            write(teava[1], &ok, sizeof(int));
+            close(teava[1]);
 
+        }else if(strcmp(tokens[0], "ls") == 0){
+            /*ls function implementation*/
+
+            result = ls_func(tokens);
+
+            ok = true;
+            write(teava[1], &ok, sizeof(int));
+            close(teava[1]);
 
         }else if(execvp(tokens[0], tokens) != -1){
 
@@ -115,11 +192,12 @@ bool interpretLine(char* buffer, char** tokens){
 
             return conditie;
 
-        } else {
+        } else if(conditie == 2){
+
+            cd_func(tokens);
+            return true;
 
         }
-
-
 
     }
 
@@ -153,12 +231,16 @@ void parse(char* line, char** arg){
 /*main loop*/
 void command_loop(){
 
+    char* buf;
+    long size = pathconf(".", _PC_PATH_MAX);
+
     bool status = true;
     char* line;
     char* arguments[1024];
 
     while(status){
 
+        printf("\n%s", getcwd(buf, (size_t)size));
         line = readline(">>");
 
         if(strlen(line) != 0){ //empty string
