@@ -17,12 +17,13 @@ typedef int bool;
 extern int alphasort();//from direct.h
 
 //all the supported commands
-char* univ_commands[4] = {"exit", "-help", "cd", "ls", NULL};
+char* univ_commands[5] = {"exit", "-help", "cd", "ls", "tac", NULL};
 
 //exit - 0
 //-help - 1
 //cd - 2
 //ls -3
+//tac -4
 
 
 /**help function**/
@@ -33,6 +34,25 @@ void printHelp(){
 
 }
 
+/**helper function to get the number of args**/
+int arg_num(char** arg){
+
+    int i = 0;
+    int num = 0;
+
+    while(arg[i] != NULL){
+
+       // if( *(*arg[i]) == '\0' || *(*arg[i]) == ' ' || *(*arg[0]) == '\n' || *(*arg[0]) == '\t'){
+        if(arg[i][0] == '\0' || arg[i][0] == ' ' || arg[i][0] == '\n' || arg[i][0] == '\t' ){
+
+            break;
+        }
+            num++;
+            i++;
+    }
+
+    return num;
+}
 
 /**Actuall implementation of cd**/
 int cd_func(char **arg){
@@ -52,50 +72,138 @@ int cd_func(char **arg){
 
 }
 
-/*Helper function for the ls*/
-
-/*static int file_select(const struct dirent *temp){
-
-
-    if(strcmp(temp->d_name, ".") == 0 || strcmp(temp->d_name, "..") == 0){
-
-        return false;
-
-    } else {
-
-        return true;
-    }
-
-}*/
-
 /**Implementation of Ls**/
-int ls_func(char **arg){
+int ls_func(int argc, char **arg){
 
     char *crr_dir;
+    DIR *dp = NULL;
     int count;
-    struct dirent **files;
+    struct dirent *files;
 
-    char* d = getcwd(crr_dir, sizeof(crr_dir));
+    crr_dir = getenv("PWD");
 
-    count = scandir(".", &files, NULL, alphasort);
+    if(crr_dir == NULL){
 
-    if(count <= 0){
-
-        printf("\nNo files in the directory");
-        return 1;
+        perror("Something went wrong :(");
+        return -1;
     }
 
-    printf("\nFiles:\n\n");
-    for(int i = 2; i < count; i++){//starts from 2 so it can skip over "." and ".."
+    dp = opendir((const char*) crr_dir);
 
-        printf("%s ", files[i]->d_name);
+    if(dp == NULL){
+
+        perror("Something went wrong :(");
+        return -1;
+    }
+
+
+    /*check for flags*/
+     if(strcmp(arg[1], "-a") == 0){
+
+        printf("\n");
+
+        for(count = 0; (files = readdir(dp)) != NULL; count++){
+
+            printf("%s ", files->d_name);
+
+        }
+
+        printf("\n");
+
+        return 1;
+
+    }
+
+    printf("\n");
+
+    for(count = 0; (files = readdir(dp)) != NULL; count++){
+
+        if(files->d_name[0] != '.'){
+
+            printf("%s ", files->d_name);
+        }
     }
 
     printf("\n");
 
     return 1;
 
+}
 
+/*helper function to get the number of lines in a file*/
+int get_lines(FILE* p){
+
+    int num = 0;
+    char c = fgetc(p);
+
+    while(c != EOF){
+
+        c = fgetc(p);
+
+        if(c == '\n'){
+            num++;
+        }
+    }
+
+    return num;
+
+}
+
+/*Implementation of cat function*/
+int tac_func(int argv, char **arg){
+
+
+    FILE* fp = fopen(arg[1], "r");
+
+    if(fp == NULL){
+
+        perror("Could not open file");
+        return -1;
+    }
+
+    int line_num = get_lines(fp);
+
+    char lines[line_num][1024];
+    rewind(fp);
+
+    char* crrLine = NULL;
+    size_t len = 0;
+    ssize_t read;
+
+    int index = 0;
+
+    /*tac txt.txt*/
+    if(strcmp(arg[1], "-b") != 0 || strcmp(arg[1], "-s") != 0){
+        //read line by line
+
+        while((read = getline(&crrLine, &len, fp)) != -1){
+
+            strcpy(lines[index], crrLine);
+            index++;
+
+        }
+
+
+
+    /*tac -b txt.txt*/
+    }else if(strcmp(arg[1], "-b") == 0){
+
+
+    }
+
+    /* print the list backwards */
+
+    printf("\n");
+
+    for(int i = index -1; i >= 0; i--){
+
+        printf("%s", lines[i]);
+    }
+
+    free(crrLine);
+    fclose(fp);
+
+    return 1;
 
 }
 
@@ -155,7 +263,15 @@ bool interpretLine(char* buffer, char** tokens){
         }else if(strcmp(tokens[0], "ls") == 0){
             /*ls function implementation*/
 
-            result = ls_func(tokens);
+            result = ls_func(arg_num(tokens), tokens);
+
+            ok = true;
+            write(teava[1], &ok, sizeof(int));
+            close(teava[1]);
+
+        } else if(strcmp(tokens[0], "tac") == 0){
+
+            result = tac_func(arg_num(tokens), tokens);
 
             ok = true;
             write(teava[1], &ok, sizeof(int));
@@ -213,7 +329,7 @@ void parse(char* line, char** arg){
             *line++ = '\0';
         }
 
-        //save it in the aarg **
+        //save it in the arg **
         *arg++ = line;
 
         while(*line != '\0' && *line != '\n' && *line != '\t' && *line != ' '){
