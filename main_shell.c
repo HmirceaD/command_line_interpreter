@@ -150,7 +150,7 @@ int get_lines(FILE* p){
 }
 
 /*Implementation of cat function*/
-int tac_func(int argv, char **arg){
+int tac_func(int argc, char **arg){
 
 
     FILE* fp = fopen(arg[1], "r");
@@ -173,7 +173,7 @@ int tac_func(int argv, char **arg){
     int index = 0;
 
     /*tac txt.txt*/
-    if(strcmp(arg[1], "-b") != 0 || strcmp(arg[1], "-s") != 0){
+    if(strcmp(arg[1], "-b ") != 0 || strcmp(arg[1], "-s") != 0){
         //read line by line
 
         while((read = getline(&crrLine, &len, fp)) != -1){
@@ -186,19 +186,71 @@ int tac_func(int argv, char **arg){
 
 
     /*tac -b txt.txt*/
-    }else if(strcmp(arg[1], "-b") == 0){
+    }else if(strcmp(arg[1], "-b ") == 0){
 
-
+        //TODO
     }
 
     /* print the list backwards */
 
-    printf("\n");
+    if((argc == 4 && strcmp(arg[2], ">") == 0) || (argc == 5 && strcmp(arg[3], ">") == 0)){
 
-    for(int i = index -1; i >= 0; i--){
+        FILE* toFp;
 
-        printf("%s", lines[i]);
+        if(argc == 4){
+
+            toFp = fopen(arg[3], "w");
+
+            if(toFp == NULL){
+
+                printf("Something went wrong when opening the file '%s'", arg[3]);
+                return -1;
+
+            }
+        }else if(argc == 5){
+
+            toFp = fopen(arg[4], "w");
+
+
+            if(toFp == NULL){
+
+                printf("Something went wrong when opening the file '%s'", arg[4]);
+                return -1;
+
+            }
+        }
+
+
+        int j = index - 1;
+
+        int res;
+
+        while(j >= 0){
+
+            res = fputs(lines[j], toFp);
+
+            if(res == EOF){
+
+                perror("Somethig went wrong when writting to the second file mate");
+                return -1;
+            }
+
+            j--;
+        }
+
+        fclose(toFp);
+
+
+    }else{
+
+        printf("\n");
+
+        for(int i = index -1; i >= 0; i--){
+
+            printf("%s", lines[i]);
+        }
     }
+
 
     free(crrLine);
     fclose(fp);
