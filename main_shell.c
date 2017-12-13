@@ -149,11 +149,72 @@ int get_lines(FILE* p){
 
 }
 
+char* parseDirString(char* buffer){
+
+    int length = strlen(buffer);
+    int lastPos = 0, pos = -1;
+    char* auxString = (char*)malloc(sizeof(buffer));
+
+    for(int i = 0; i < length; i++){
+
+        pos++;
+
+        if(buffer[i] == '/' && pos + 1 != length){
+
+            lastPos = pos;
+        }
+    }
+
+    if(lastPos == 0){
+
+        return ".";
+    }else {
+
+        strncpy(auxString, buffer, lastPos);
+        auxString[lastPos] = '\0';
+
+        return auxString;
+    }
+
+}
+
+/*Implementation of dirname function*/
+int dir_func(int argc, char** arg){
+
+    /* '.' cases*/
+
+    if(argc == 1){
+
+        printf("dirname missing operand, see --help\n");
+        return -1;
+    }
+
+    //char* buffer;
+
+    for(int i = 1; i < argc; i++){
+
+        printf("\n%s\n", parseDirString(arg[i]));
+
+    }
+
+    return 1;
+
+}
+
 /*Implementation of cat function*/
-int tac_func(int argc, char **arg){
+int tac_func(int argc, char** arg){
 
+    FILE* fp;
 
-    FILE* fp = fopen(arg[1], "r");
+    if(strcmp(arg[1], "-b") != 0 && strcmp(arg[1], "-s") != 0){
+
+        fp = fopen(arg[1], "r");
+
+    }if(strcmp(arg[1], "-b") == 0 || strcmp(arg[1], "-s") == 0){
+
+        fp = fopen(arg[2], "r");
+    }
+
 
     if(fp == NULL){
 
@@ -173,8 +234,10 @@ int tac_func(int argc, char **arg){
     int index = 0;
 
     /*tac txt.txt*/
-    if(strcmp(arg[1], "-b ") != 0 || strcmp(arg[1], "-s") != 0){
+    if((strcmp(arg[1], "-b") != 0) && (strcmp(arg[1], "-s") != 0)){
         //read line by line
+
+        printf("%s", arg[1]);
 
         while((read = getline(&crrLine, &len, fp)) != -1){
 
@@ -183,10 +246,12 @@ int tac_func(int argc, char **arg){
 
         }
 
-
-
     /*tac -b txt.txt*/
-    }else if(strcmp(arg[1], "-b ") == 0){
+    }else if(strcmp(arg[1], "-b") == 0){
+
+
+        //TODO
+    }else if(strcmp(arg[1], "-s") == 0){
 
         //TODO
     }
@@ -324,6 +389,14 @@ bool interpretLine(char* buffer, char** tokens){
         } else if(strcmp(tokens[0], "tac") == 0){
 
             result = tac_func(arg_num(tokens), tokens);
+
+            ok = true;
+            write(teava[1], &ok, sizeof(int));
+            close(teava[1]);
+
+        }else if(strcmp(tokens[0], "dirname") == 0){
+
+            result = dir_func(arg_num(tokens), tokens);
 
             ok = true;
             write(teava[1], &ok, sizeof(int));
