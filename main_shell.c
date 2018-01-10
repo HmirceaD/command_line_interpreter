@@ -498,7 +498,7 @@ int numOfPipes(char** tokens){
 
 void parseCommands(char** current_tokens, char** arg){
 
-    char* tempString = (char*)malloc(sizeof(char) * 1024);
+    char* tempString = (char*)malloc(sizeof(char) * 1000024);
 
     int j = 0;
     int t = 0;
@@ -513,7 +513,7 @@ void parseCommands(char** current_tokens, char** arg){
 
         }else if(strcmp(current_tokens[i], "|") == 0){
 
-            arg[j] = (char*)malloc(sizeof(char) * 1024);
+            arg[j] = (char*)malloc(sizeof(char) * 1000024);
 
             strcpy(arg[j], tempString);
             j++;
@@ -523,11 +523,13 @@ void parseCommands(char** current_tokens, char** arg){
         }
     }
 
-    arg[j] = (char*)malloc(sizeof(char) * 1024);
+    arg[j] = (char*)malloc(sizeof(char) * 1000024);
 
     arg[j] = tempString;
 
     arg[++j] = 0;
+
+    //free(tempString);
 }
 
 /*Parse the line and break it into arguments*/
@@ -591,12 +593,12 @@ int interpretPipeLine(char* buffer, char** tokens){
 
     /*handle the piping*/
 
-    pid_t pid;
-    int in, teava[2];
+    //pid_t pid;
+    //int in, teava[2];
 
-    pipe(teava);
+    //pipe(teava);
 
-    if(fork() == 0){
+    /*if(fork() == 0){
 
         close(0);
 
@@ -608,9 +610,6 @@ int interpretPipeLine(char* buffer, char** tokens){
         parse(commands[1], fragm_commands);
 
         fragm_commands[arg_num(fragm_commands)] = NULL;
-
-        printf("%s%s%s", fragm_commands[0], fragm_commands[1], fragm_commands[2]);
-
 
         execvp(fragm_commands[0], fragm_commands);
 
@@ -627,41 +626,79 @@ int interpretPipeLine(char* buffer, char** tokens){
 
         fragm_commands[arg_num(fragm_commands)] = NULL;
 
+        execvp(fragm_commands[0], fragm_commands);
+
+    }*/
+
+    pid_t pid;
+
+    pid = fork();
+
+    if(pid == -1){
+
+        perror("Something went wrong mate");
+        exit(1);
+    }
+
+    if(pid == 0){
+
+        int i;
+        //asta nu
+        for(i = 0; i < arg_num(commands) - 1; i++){
+
+            int teava[2];
+
+            if(pipe(teava) == -1){
+
+                perror("Pipe's broken");
+                exit(2);
+            }
+
+            if(fork() == 0){
+
+
+                dup2(teava[1], 1);
+                close(teava[0]);
+
+                parse(commands[0], fragm_commands);
+
+                fragm_commands[arg_num(fragm_commands)] = NULL;
+
+                execvp(fragm_commands[0], fragm_commands);
+
+                perror("Something went wrong my dude");
+                abort();
+
+            }
+
+            dup2(teava[0], 0);
+            close(teava[1]);
+            wait(&pid);
+
+        }
+
+        parse(commands[i], fragm_commands);
+
+        fragm_commands[arg_num(fragm_commands)] = NULL;
 
         execvp(fragm_commands[0], fragm_commands);
 
     }
 
+    if(pid > 0){
 
-    //asta nu
-    /*for(int i = 0; i < arg_num(commands); i++){
+        wait(&pid);
 
-        pipe(teava);
-
-        parse(commands[++i], fragm_commands);
-
-        spawnProc(in, teava[1], fragm_commands);
-
-        close(teava[1]);
-
-        in = teava[0];
-
+        return status;
     }
 
-    if(in != 0){
 
-        dup2(in, 0);
-    }*/
 
-    /*
-    parse(commands[0], fragm_commands);
+    //if(in != 0){
 
-    char* dorel[] = {"-l", NULL};
+        //dup2(in, 0);
+    //}
 
-    execvp("ls", dorel);
-    */
-
-    return status;
 }
 
 int checkPipeAndRedir(char** args){
