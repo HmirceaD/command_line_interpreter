@@ -6,6 +6,8 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/dir.h>
+#include <sys/stat.h>
+
 
 #include <readline/readline.h>
 #include <readline/history.h>
@@ -99,7 +101,7 @@ int ls_func(int argc, char **arg){
 
     /*check for flags*/
      if(strcmp(arg[1], "-a") == 0){
-
+        /*ls -a*/
         printf("\n");
 
         for(count = 0; (files = readdir(dp)) != NULL; count++){
@@ -112,6 +114,38 @@ int ls_func(int argc, char **arg){
 
         return 1;
 
+    }
+
+    if(strcmp(arg[1], "-s") == 0){
+        /*ls -s*/
+
+        int total_bytes = 0;
+
+        struct stat st;
+
+        for(count = 0; (files = readdir(dp)) != NULL; count++){
+
+            printf("%s ", files->d_name);
+
+            stat(files->d_name, &st);
+
+            printf("%zd ", st.st_size/8);
+
+            total_bytes += (st.st_size/8);
+
+            printf("\n");
+        }
+
+        printf("Total: %d", total_bytes);
+
+        return 1;
+
+    }
+
+    if(strcmp(arg[1], "-l") == 0){
+
+        printf("l");
+        return 1;
     }
 
     printf("\n");
@@ -444,6 +478,58 @@ bool interpretLine(char* buffer, char** tokens){
 
 }
 
+int numOfPipes(char** tokens){
+
+
+    int i = 0, num = 0;
+
+    while(tokens[i] != NULL){
+
+        if(strcmp(tokens[i], "|") == 0){
+
+            num++;
+        }
+
+        i++;
+    }
+
+    return num;
+}
+
+void parseCommands(char** current_tokens, char** arg){
+
+    char* tempString = (char*)malloc(sizeof(char) * 1024);
+
+    int j = 0;
+    int t = 0;
+
+    for(int i = 0; i < arg_num(current_tokens); i++){
+
+        if(strcmp(current_tokens[i], "|") != 0){
+
+            strcat(tempString, current_tokens[i]);
+            strcat(tempString, " ");
+
+
+        }else if(strcmp(current_tokens[i], "|") == 0){
+
+            arg[j] = (char*)malloc(sizeof(char) * 1024);
+
+            strcpy(arg[j], tempString);
+            j++;
+
+            strcpy(tempString, "");
+
+        }
+    }
+
+    arg[j] = (char*)malloc(sizeof(char) * 1024);
+
+    arg[j] = tempString;
+
+    arg[++j] = 0;
+}
+
 /*Parse the line and break it into arguments*/
 void parse(char* line, char** arg){
 
@@ -469,6 +555,133 @@ void parse(char* line, char** arg){
 
 }
 
+int spawnProc(int in, int out, char** args){
+
+    pid_t pid;
+
+    if((pid = fork()) == 0){
+
+        if(in != 0){
+
+            dup2(in, 0);
+            close(in);
+        }
+
+        if(out != 1){
+
+            dup2(out, 1);
+            close(out);
+        }
+
+        return execvp(args[0], args);
+    }
+
+    return pid;
+
+}
+
+int interpretPipeLine(char* buffer, char** tokens){
+
+    bool status = true;
+
+    char* commands[1024];
+    char* fragm_commands[1024];
+    //numOfPipes(tokens);
+    parseCommands(tokens, commands);
+
+    /*handle the piping*/
+
+    pid_t pid;
+    int in, teava[2];
+
+    pipe(teava);
+
+    if(fork() == 0){
+
+        close(0);
+
+        dup(teava[0]);
+
+        close(teava[0]);
+        close(teava[1]);
+
+        parse(commands[1], fragm_commands);
+
+        fragm_commands[arg_num(fragm_commands)] = NULL;
+
+        printf("%s%s%s", fragm_commands[0], fragm_commands[1], fragm_commands[2]);
+
+
+        execvp(fragm_commands[0], fragm_commands);
+
+    } else {
+
+        close(1);
+
+        dup(teava[1]);
+
+        close(teava[0]);
+        close(teava[1]);
+
+        parse(commands[0], fragm_commands);
+
+        fragm_commands[arg_num(fragm_commands)] = NULL;
+
+
+        execvp(fragm_commands[0], fragm_commands);
+
+    }
+
+
+    //asta nu
+    /*for(int i = 0; i < arg_num(commands); i++){
+
+        pipe(teava);
+
+        parse(commands[++i], fragm_commands);
+
+        spawnProc(in, teava[1], fragm_commands);
+
+        close(teava[1]);
+
+        in = teava[0];
+
+    }
+
+    if(in != 0){
+
+        dup2(in, 0);
+    }*/
+
+    /*
+    parse(commands[0], fragm_commands);
+
+    char* dorel[] = {"-l", NULL};
+
+    execvp("ls", dorel);
+    */
+
+    return status;
+}
+
+int checkPipeAndRedir(char** args){
+
+    int i = 0;
+    bool OK = false;
+
+    while(args[i] != NULL){
+
+        if(strcmp(args[i], "|") == 0 || strcmp(args[i], ">") == 0){
+            OK = true;
+        }
+
+        i++;
+    }
+
+    return OK;
+
+}
+
 /*main loop*/
 void command_loop(){
 
@@ -479,6 +692,8 @@ void command_loop(){
     char* line;
     char* arguments[1024];
 
+    bool isPipe = false;
+
     while(status){
 
         printf("\n%s", getcwd(buf, (size_t)size));
@@ -486,9 +701,18 @@ void command_loop(){
 
         if(strlen(line) != 0){ //empty string
 
-        add_history(line);
-        parse(line, arguments);
-        status = interpretLine(line, arguments);
+        add_history(line); // add to history
+        parse(line, arguments); // break the arguments into tokens
+
+        isPipe = checkPipeAndRedir(arguments); // see if there are > and |
+
+            if(!isPipe){
+
+                status = interpretLine(line, arguments);
+            }else{
+
+                status = interpretPipeLine(line, arguments);
+            }
 
         }
 
