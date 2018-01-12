@@ -7,6 +7,7 @@
 #include <sys/param.h>
 #include <sys/dir.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 
 
 #include <readline/readline.h>
@@ -129,14 +130,18 @@ int ls_func(int argc, char **arg){
 
             stat(files->d_name, &st);
 
-            printf("%zd ", st.st_size/8);
+            //printf("%zd ", st.st_size/8);
 
-            total_bytes += (st.st_size/8);
+            //total_bytes += (st.st_size/8);
+
+            printf("%zd ", st.st_blocks / 2);
+
+            total_bytes += (st.st_blocks / 2);
 
             printf("\n");
         }
 
-        printf("Total: %d", total_bytes);
+        printf("Total blocks: %d", total_bytes);
 
         return 1;
 
@@ -446,7 +451,7 @@ bool interpretLine(char* buffer, char** tokens){
         } else {
 
             /*random garbage*/
-            printf("I don't know this command, see -help for info\n");
+            printf("I don't know what '%s' is, see -help for info\n", tokens[0]);
         }
 
     }
@@ -588,47 +593,10 @@ int interpretPipeLine(char* buffer, char** tokens){
 
     char* commands[1024];
     char* fragm_commands[1024];
-    //numOfPipes(tokens);
+
     parseCommands(tokens, commands);
 
     /*handle the piping*/
-
-    //pid_t pid;
-    //int in, teava[2];
-
-    //pipe(teava);
-
-    /*if(fork() == 0){
-
-        close(0);
-
-        dup(teava[0]);
-
-        close(teava[0]);
-        close(teava[1]);
-
-        parse(commands[1], fragm_commands);
-
-        fragm_commands[arg_num(fragm_commands)] = NULL;
-
-        execvp(fragm_commands[0], fragm_commands);
-
-    } else {
-
-        close(1);
-
-        dup(teava[1]);
-
-        close(teava[0]);
-        close(teava[1]);
-
-        parse(commands[0], fragm_commands);
-
-        fragm_commands[arg_num(fragm_commands)] = NULL;
-
-        execvp(fragm_commands[0], fragm_commands);
-
-    }*/
 
     pid_t pid;
 
@@ -643,7 +611,7 @@ int interpretPipeLine(char* buffer, char** tokens){
     if(pid == 0){
 
         int i;
-        //asta nu
+
         for(i = 0; i < arg_num(commands) - 1; i++){
 
             int teava[2];
@@ -656,24 +624,62 @@ int interpretPipeLine(char* buffer, char** tokens){
 
             if(fork() == 0){
 
-
                 dup2(teava[1], 1);
                 close(teava[0]);
 
-                parse(commands[0], fragm_commands);
+                parse(commands[i], fragm_commands);
 
                 fragm_commands[arg_num(fragm_commands)] = NULL;
 
-                execvp(fragm_commands[0], fragm_commands);
+                //parse for redirects
+                for(int j = 0; j < arg_num(fragm_commands); j++){
+
+                    if(strcmp(fragm_commands[j], "<") == 0){
+
+                        int fd = open(fragm_commands[++j], O_RDONLY);
+
+                        dup2(fd, STDIN_FILENO);
+                        close(fd);
+
+                    }
+
+                    if(strcmp(fragm_commands[j], ">") == 0){
+
+                        int fd1 = creat(fragm_commands[++j], 0644);
+
+                        dup2(fd1, STDOUT_FILENO);
+                        close(fd1);
+                    }
+                }
+
+                char* mitu[arg_num(fragm_commands)];
+
+                int k;
+
+                for(k = 0; k < arg_num(fragm_commands); k++){
+
+                    if(strcmp(fragm_commands[k], ">") == 0 || strcmp(fragm_commands[k], "<") == 0){
+
+                        break;
+                    }
+
+                    mitu[k] = fragm_commands[k];
+                }
+
+                mitu[k] = NULL;
+
+                execvp(mitu[0], mitu);
+
+                //execvp(fragm_commands[0], fragm_commands);
 
                 perror("Something went wrong my dude");
                 abort();
 
             }
 
+            wait(&pid);
             dup2(teava[0], 0);
             close(teava[1]);
-            wait(&pid);
 
         }
 
@@ -681,7 +687,50 @@ int interpretPipeLine(char* buffer, char** tokens){
 
         fragm_commands[arg_num(fragm_commands)] = NULL;
 
-        execvp(fragm_commands[0], fragm_commands);
+        for(int j = 0; j < arg_num(fragm_commands); j++){
+
+                if(strcmp(fragm_commands[j], ">") == 0){
+
+                    int fd1 = creat(fragm_commands[++j], 0644);
+
+                    dup2(fd1, STDOUT_FILENO);
+                    close(fd1);
+                }
+
+                if(strcmp(fragm_commands[j], "<") == 0){
+
+                    int fd2 = open(fragm_commands[++j], O_RDONLY);
+
+                    //fflush(stdin);
+                    //fpos_t pos;
+                    //fgetpos(stdin, &pos);
+
+                    dup2(fd2, STDIN_FILENO);
+                    close(fd2);
+                }
+        }
+
+        char* titu[arg_num(fragm_commands)];
+
+        int z;
+
+        for(z = 0; z < arg_num(fragm_commands); z++){
+
+            if(strcmp(fragm_commands[z], ">") == 0 || strcmp(fragm_commands[z], "<") == 0){
+
+                break;
+            }
+
+            titu[z] = fragm_commands[z];
+        }
+
+        titu[z] = NULL;
+
+        execvp(titu[0], titu);
+
+        perror("Something went wrong my dude");
+        abort();
+
 
     }
 
@@ -692,13 +741,6 @@ int interpretPipeLine(char* buffer, char** tokens){
         return status;
     }
 
-
-
-    //if(in != 0){
-
-        //dup2(in, 0);
-    //}
-
 }
 
 int checkPipeAndRedir(char** args){
@@ -708,7 +750,7 @@ int checkPipeAndRedir(char** args){
 
     while(args[i] != NULL){
 
-        if(strcmp(args[i], "|") == 0 || strcmp(args[i], ">") == 0){
+        if(strcmp(args[i], "|") == 0 || strcmp(args[i], ">") == 0 || strcmp(args[i], "<") == 0){
             OK = true;
         }
 
@@ -762,12 +804,23 @@ void command_loop(){
 /*main*/
 int main(int argc, char **argv){
 
-    printf("\n=========== SHELL ===========\n\nSee'-help' for instructions how to use the commands\n\n");
+    printf("\n===========================================================");
+    printf("\n=                                                         =");
+    printf("\n=                                                         =");
+    printf("\n=             Hello, it's me, your terminal               =");
+    printf("\n=                                                         =");
+    printf("\n= See'-help' for instructions on how to use the commands  =");
+    printf("\n=                                                         =");
+    printf("\n=                                                         =");
+    printf("\n===========================================================");
+    printf("\n");
 
     command_loop();
 
     return 0;
 
 }
+
+//TODO:  add your own commands to piping, add the flags -l -F to ls, and -b tac
 
 
