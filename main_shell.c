@@ -75,6 +75,40 @@ int cd_func(char **arg){
 
 }
 
+void appendFileType(struct stat st){
+
+    if(S_ISDIR(st.st_mode)){
+        /*directory*/
+        printf("/");
+        return;
+    }
+
+    if(S_ISFIFO(st.st_mode)){
+        /*pipe*/
+        printf("|");
+        return;
+    }
+
+    if(S_ISLNK(st.st_mode)){
+        /*symbolic link*/
+        printf("@");
+        return;
+    }
+
+    if(S_ISSOCK(st.st_mode)){
+        /*socket*/
+        printf("=");
+        return;
+    }
+
+    if(st.st_mode & S_IXUSR){
+        /*executable*/
+        printf("*");
+        return;
+    }
+
+}
+
 /**Implementation of Ls**/
 int ls_func(int argc, char **arg){
 
@@ -82,6 +116,11 @@ int ls_func(int argc, char **arg){
     DIR *dp = NULL;
     int count;
     struct dirent *files;
+
+    bool isA = false;
+    bool isS = false;
+    bool isF = false;
+    bool isL = false;
 
     crr_dir = getenv("PWD");
 
@@ -101,69 +140,108 @@ int ls_func(int argc, char **arg){
 
 
     /*check for flags*/
-     if(strcmp(arg[1], "-a") == 0){
-        /*ls -a*/
-        printf("\n");
 
-        for(count = 0; (files = readdir(dp)) != NULL; count++){
+    for(int i = 0; i < arg_num(arg); i++){
 
-            printf("%s ", files->d_name);
+        if(strcmp(arg[i], "-a") == 0){
 
+            isA = true;
         }
 
-        printf("\n");
+        if(strcmp(arg[i], "-s") == 0){
 
-        return 1;
-
-    }
-
-    if(strcmp(arg[1], "-s") == 0){
-        /*ls -s*/
-
-        int total_bytes = 0;
-
-        struct stat st;
-
-        for(count = 0; (files = readdir(dp)) != NULL; count++){
-
-            printf("%s ", files->d_name);
-
-            stat(files->d_name, &st);
-
-            //printf("%zd ", st.st_size/8);
-
-            //total_bytes += (st.st_size/8);
-
-            printf("%zd ", st.st_blocks / 2);
-
-            total_bytes += (st.st_blocks / 2);
-
-            printf("\n");
+            isS = true;
         }
 
-        printf("Total blocks: %d", total_bytes);
+        if(strcmp(arg[i], "-F") == 0){
 
-        return 1;
+            isF = true;
+        }
 
-    }
+        if(strcmp(arg[i], "-l") == 0){
 
-    if(strcmp(arg[1], "-l") == 0){
+            isL = true;
+        }
 
-        printf("l");
-        return 1;
     }
 
     printf("\n");
+
+    int total_blocks = 0;
+    struct stat st;
 
     for(count = 0; (files = readdir(dp)) != NULL; count++){
 
-        if(files->d_name[0] != '.'){
 
-            printf("%s ", files->d_name);
+        if(isS){
+
+            if(isA){
+
+                printf("\n%s", files->d_name);
+
+                stat(files->d_name, &st);
+
+                    if(isF)
+                        appendFileType(st);
+
+                printf(" %zd ", st.st_blocks / 2);
+
+                total_blocks += (st.st_blocks / 2);
+
+            }else {
+
+                if(files->d_name[0] != '.'){
+
+                    printf("\n%s", files->d_name);
+
+                    stat(files->d_name, &st);
+
+                        if(isF)
+                            appendFileType(st);
+
+                    printf("%zd ", st.st_blocks / 2);
+
+                    total_blocks += (st.st_blocks / 2);
+
+                }
+            }
+
+        }else {/*!-s*/
+
+            if(isA){
+
+                printf("\n%s", files->d_name);
+
+                if(isF){
+
+                    stat(files->d_name, &st);
+                    appendFileType(st);
+                }
+
+
+            }else {
+
+                if(files->d_name[0] != '.')
+                    printf("\n%s", files->d_name);
+
+                if(isF){
+                    stat(files->d_name, &st);
+                    appendFileType(st);
+                }
+
+            }
+
         }
+
     }
 
+
     printf("\n");
+
+    if(isS)
+        printf("Total number of blocks is: %d", total_blocks);
+
+
 
     return 1;
 
@@ -227,8 +305,6 @@ int dir_func(int argc, char** arg){
         printf("dirname missing operand, see --help\n");
         return -1;
     }
-
-    //char* buffer;
 
     for(int i = 1; i < argc; i++){
 
@@ -668,16 +744,32 @@ int interpretPipeLine(char* buffer, char** tokens){
 
                 mitu[k] = NULL;
 
-                execvp(mitu[0], mitu);
+                if(strcmp(mitu[0], "ls") == 0){
 
-                //execvp(fragm_commands[0], fragm_commands);
+                    ls_func(arg_num(mitu), mitu);
+                    exit(0);
+                }
+
+                if(strcmp(mitu[0], "dirname") == 0){
+
+                    dir_func(arg_num(mitu), mitu);
+                    exit(0);
+                }
+
+                if(strcmp(mitu[0], "tac") == 0){
+
+                    dir_func(arg_num(mitu), mitu);
+                    exit(0);
+                }
+
+                execvp(mitu[0], mitu);
 
                 perror("Something went wrong my dude");
                 abort();
 
             }
 
-            wait(&pid);
+            //wait(&pid);
             dup2(teava[0], 0);
             close(teava[1]);
 
@@ -693,6 +785,12 @@ int interpretPipeLine(char* buffer, char** tokens){
 
                     int fd1 = creat(fragm_commands[++j], 0644);
 
+                    if(fd1 < 0){
+
+                        perror("Can't open that file");
+                        exit(3);
+                    }
+
                     dup2(fd1, STDOUT_FILENO);
                     close(fd1);
                 }
@@ -701,9 +799,11 @@ int interpretPipeLine(char* buffer, char** tokens){
 
                     int fd2 = open(fragm_commands[++j], O_RDONLY);
 
-                    //fflush(stdin);
-                    //fpos_t pos;
-                    //fgetpos(stdin, &pos);
+                    if(fd2 < 0){
+
+                        perror("Can't open that file");
+                        exit(4);
+                    }
 
                     dup2(fd2, STDIN_FILENO);
                     close(fd2);
@@ -725,6 +825,24 @@ int interpretPipeLine(char* buffer, char** tokens){
         }
 
         titu[z] = NULL;
+
+        if(strcmp(titu[0], "ls") == 0){
+
+            ls_func(arg_num(titu), titu);
+            exit(0);
+        }
+
+        if(strcmp(titu[0], "dirname") == 0){
+
+            dir_func(arg_num(titu), titu);
+            exit(0);
+        }
+
+        if(strcmp(mitu[0], "tac") == 0){
+
+            dir_func(arg_num(mitu), mitu);
+            exit(0);
+        }
 
         execvp(titu[0], titu);
 
