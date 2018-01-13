@@ -8,6 +8,8 @@
 #include <sys/dir.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <time.h>
+#include <pwd.h>
 
 
 #include <readline/readline.h>
@@ -27,7 +29,6 @@ char* univ_commands[5] = {"exit", "-help", "cd", "ls", "tac", NULL};
 //cd - 2
 //ls -3
 //tac -4
-
 
 /**help function**/
 void printHelp(){
@@ -72,6 +73,56 @@ int cd_func(char **arg){
 
         return chdir(arg[1]);
     }
+
+}
+
+void appendFileInfo(struct stat st){
+
+    /*first field*/
+
+    if(S_ISLNK(st.st_mode)){
+
+        printf("l");
+    }else if(S_ISREG(st.st_mode)){
+
+        printf("-");
+    }else if(S_ISDIR(st.st_mode)){
+
+        printf("d");
+    }
+
+    /*second, third and forth fields*/
+
+    printf((st.st_mode & S_IRUSR) ? "r" : "-");
+    printf((st.st_mode & S_IWUSR) ? "w" : "-");
+    printf((st.st_mode & S_IXUSR) ? "x" : "-");
+    printf((st.st_mode & S_IRGRP) ? "r" : "-");
+    printf((st.st_mode & S_IWGRP) ? "w" : "-");
+    printf((st.st_mode & S_IXGRP) ? "x" : "-");
+    printf((st.st_mode & S_IROTH) ? "r" : "-");
+    printf((st.st_mode & S_IWOTH) ? "w" : "-");
+    printf((st.st_mode & S_IXOTH) ? "x" : "-");
+
+    /*fifth field*/
+    printf(" %lu", st.st_nlink);
+
+    /*sixth field*/
+    struct passwd *pwd1 = getpwuid(st.st_uid);
+
+    if(pwd1 != NULL)
+        printf(" %s", pwd1->pw_name);
+
+    /*seventh field*/
+    struct passwd *pwd2 = getpwuid(st.st_gid);
+
+    if(pwd2 != NULL)
+        printf(" %s", pwd2->pw_name);
+
+    /*eighth field*/
+    printf(" %ld", st.st_size);
+
+    /*ninth field*/
+    printf(" %s", ctime(&st.st_mtime));
 
 }
 
@@ -138,7 +189,6 @@ int ls_func(int argc, char **arg){
         return -1;
     }
 
-
     /*check for flags*/
 
     for(int i = 0; i < arg_num(arg); i++){
@@ -172,14 +222,16 @@ int ls_func(int argc, char **arg){
 
     for(count = 0; (files = readdir(dp)) != NULL; count++){
 
-
         if(isS){
 
             if(isA){
 
-                printf("\n%s", files->d_name);
-
                 stat(files->d_name, &st);
+
+                    if(isL)
+                        appendFileInfo(st);
+
+                printf("%s", files->d_name);
 
                     if(isF)
                         appendFileType(st);
@@ -188,13 +240,18 @@ int ls_func(int argc, char **arg){
 
                 total_blocks += (st.st_blocks / 2);
 
+                printf("\n");
+
             }else {
 
                 if(files->d_name[0] != '.'){
 
-                    printf("\n%s", files->d_name);
-
                     stat(files->d_name, &st);
+
+                    if(isL)
+                        appendFileInfo(st);
+
+                    printf("%s", files->d_name);
 
                         if(isF)
                             appendFileType(st);
@@ -203,42 +260,66 @@ int ls_func(int argc, char **arg){
 
                     total_blocks += (st.st_blocks / 2);
 
+                    printf("\n");
+
                 }
             }
 
-        }else {/*!-s*/
+        }else{/*!-s*/
 
             if(isA){
 
-                printf("\n%s", files->d_name);
+                if(isL){
+
+                    stat(files->d_name, &st);
+                    appendFileInfo(st);
+                }
+
+                printf("%s", files->d_name);
 
                 if(isF){
 
                     stat(files->d_name, &st);
+
+                    total_blocks += (st.st_blocks / 2);
+
                     appendFileType(st);
                 }
+
+                printf("\n");
 
 
             }else {
 
-                if(files->d_name[0] != '.')
-                    printf("\n%s", files->d_name);
+                if(files->d_name[0] != '.'){
 
-                if(isF){
-                    stat(files->d_name, &st);
-                    appendFileType(st);
+                    if(isL){
+
+                        stat(files->d_name, &st);
+                        appendFileInfo(st);
+                    }
+
+                    printf("%s", files->d_name);
+
+                    if(isF){
+
+                        stat(files->d_name, &st);
+
+                        total_blocks += (st.st_blocks / 2);
+
+                        appendFileType(st);
+                    }
+
+                    printf("\n");
                 }
-
             }
-
         }
-
     }
 
 
     printf("\n");
 
-    if(isS)
+    if(isS == true || isF == true)
         printf("Total number of blocks is: %d", total_blocks);
 
 
@@ -838,9 +919,9 @@ int interpretPipeLine(char* buffer, char** tokens){
             exit(0);
         }
 
-        if(strcmp(mitu[0], "tac") == 0){
+        if(strcmp(titu[0], "tac") == 0){
 
-            dir_func(arg_num(mitu), mitu);
+            dir_func(arg_num(titu), titu);
             exit(0);
         }
 
