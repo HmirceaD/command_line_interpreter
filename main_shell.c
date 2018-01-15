@@ -34,7 +34,7 @@ char* univ_commands[5] = {"exit", "-help", "cd", "ls", "tac", NULL};
 void printHelp(){
 
     //you know what this does
-    printf("\n\nType:\n\n#exit to exit the terminal\n#ls (-l, -r) to get a list of all\n\n");
+    printf("\n\nType:\n\n#exit to exit the terminal\n#ls (-l, -a, -s, -F)\ntac (-b, -s)\n dirname to get a list of all\n\n");
 
 }
 
@@ -73,6 +73,13 @@ int cd_func(char **arg){
 
         return chdir(arg[1]);
     }
+
+}
+
+char* formatDate(char* str, time_t val){
+
+    strftime(str, 36, "%d.%m.%Y %H:%M:%S", localtime(&val));
+    return str;
 
 }
 
@@ -122,7 +129,13 @@ void appendFileInfo(struct stat st){
     printf(" %ld", st.st_size);
 
     /*ninth field*/
-    printf(" %s", ctime(&st.st_mtime));
+
+    //time_t t = st.st_mtime;
+
+    //struct tm *p = localtime(&t);
+
+    char date[36];
+    printf(" %s ", formatDate(date, st.st_mtime));
 
 }
 
@@ -191,29 +204,33 @@ int ls_func(int argc, char **arg){
 
     /*check for flags*/
 
-    for(int i = 0; i < arg_num(arg); i++){
+    if(argc > 1){
 
-        if(strcmp(arg[i], "-a") == 0){
+        for(int i = 1; i < arg_num(arg); i++){
 
-            isA = true;
-        }
+            if(strcmp(arg[i], "-a") == 0){
 
-        if(strcmp(arg[i], "-s") == 0){
+                isA = true;
+            }else if(strcmp(arg[i], "-s") == 0){
 
-            isS = true;
-        }
+                isS = true;
+            }else if(strcmp(arg[i], "-F") == 0){
 
-        if(strcmp(arg[i], "-F") == 0){
+                isF = true;
+            }else if(strcmp(arg[i], "-l") == 0){
 
-            isF = true;
-        }
+                isL = true;
+            }else{
 
-        if(strcmp(arg[i], "-l") == 0){
+                printf("I dont't know this option '%s', see -help\n", arg[i]);
+                return -1;
+            }
 
-            isL = true;
         }
 
     }
+
+
 
     printf("\n");
 
@@ -377,38 +394,94 @@ char* parseDirString(char* buffer){
 }
 
 /*Implementation of dirname function*/
-int dir_func(int argc, char** arg){
+int dir_func(int argc, char** arg, bool isLess, char* fileName){
 
     /* '.' cases*/
 
-    if(argc == 1){
+    if(argc == 1 && isLess == false){
 
-        printf("dirname missing operand, see --help\n");
-        return -1;
-    }
 
-    for(int i = 1; i < argc; i++){
+            printf("dirname missing operand, see --help\n");
+            return -1;
+        }
 
-        printf("\n%s\n", parseDirString(arg[i]));
+    if(!isLess){
 
+        for(int i = 1; i < argc; i++){
+
+            printf("\n%s\n", parseDirString(arg[i]));
+
+        }
+    }else{
+
+        FILE* fp = fopen(fileName, "r");
+
+        if(fp < 0){
+
+            printf("File died Rip X.X");
+            return -1;
+        }
+
+        char* crrLine = NULL;
+        size_t len = 0;
+        ssize_t read;
+
+
+            while((read = getline(&crrLine, &len, fp)) != -1){
+
+                printf("\n%s\n", parseDirString(crrLine));
+
+            }
     }
 
     return 1;
 
+
+
 }
 
 /*Implementation of cat function*/
-int tac_func(int argc, char** arg){
+int tac_func(int argc, char** arg, bool isLess, char* fileName){
 
     FILE* fp;
 
-    if(strcmp(arg[1], "-b") != 0 && strcmp(arg[1], "-s") != 0){
+    if(argc == 1 && isLess == false){
 
-        fp = fopen(arg[1], "r");
 
-    }if(strcmp(arg[1], "-b") == 0 || strcmp(arg[1], "-s") == 0){
+            printf("Tac function missing operands");
+            return -1;
+    }
 
-        fp = fopen(arg[2], "r");
+    if(isLess){
+
+        fp = fopen(fileName, "r");
+
+        if(fp < 0){
+
+            printf("nu mere");
+            return -1;
+        }
+
+    }else{
+
+
+        bool isTxt = false;
+
+        for(int i = 1; i < argc; i++){
+
+            if(strstr(arg[i], ".txt") != 0){
+
+                fp = fopen(arg[i], "r");
+                isTxt = true;
+                break;
+            }
+        }
+
+        if(!isTxt){
+
+            printf("No file found, see '-help'");
+            return -1;
+        }
     }
 
 
@@ -430,10 +503,6 @@ int tac_func(int argc, char** arg){
     int index = 0;
 
     /*tac txt.txt*/
-    if((strcmp(arg[1], "-b") != 0) && (strcmp(arg[1], "-s") != 0)){
-        //read line by line
-
-        printf("%s", arg[1]);
 
         while((read = getline(&crrLine, &len, fp)) != -1){
 
@@ -442,76 +511,12 @@ int tac_func(int argc, char** arg){
 
         }
 
-    /*tac -b txt.txt*/
-    }else if(strcmp(arg[1], "-b") == 0){
-
-
-        //TODO
-    }else if(strcmp(arg[1], "-s") == 0){
-
-        //TODO
-    }
-
-    /* print the list backwards */
-
-    if((argc == 4 && strcmp(arg[2], ">") == 0) || (argc == 5 && strcmp(arg[3], ">") == 0)){
-
-        FILE* toFp;
-
-        if(argc == 4){
-
-            toFp = fopen(arg[3], "w");
-
-            if(toFp == NULL){
-
-                printf("Something went wrong when opening the file '%s'", arg[3]);
-                return -1;
-
-            }
-        }else if(argc == 5){
-
-            toFp = fopen(arg[4], "w");
-
-
-            if(toFp == NULL){
-
-                printf("Something went wrong when opening the file '%s'", arg[4]);
-                return -1;
-
-            }
-        }
-
-
-        int j = index - 1;
-
-        int res;
-
-        while(j >= 0){
-
-            res = fputs(lines[j], toFp);
-
-            if(res == EOF){
-
-                perror("Somethig went wrong when writting to the second file mate");
-                return -1;
-            }
-
-            j--;
-        }
-
-        fclose(toFp);
-
-
-    }else{
-
         printf("\n");
 
         for(int i = index -1; i >= 0; i--){
 
             printf("%s", lines[i]);
         }
-    }
-
 
     free(crrLine);
     fclose(fp);
@@ -584,7 +589,7 @@ bool interpretLine(char* buffer, char** tokens){
 
         } else if(strcmp(tokens[0], "tac") == 0){
 
-            result = tac_func(arg_num(tokens), tokens);
+            result = tac_func(arg_num(tokens), tokens, false, " ");
 
             ok = true;
             write(teava[1], &ok, sizeof(int));
@@ -592,7 +597,7 @@ bool interpretLine(char* buffer, char** tokens){
 
         }else if(strcmp(tokens[0], "dirname") == 0){
 
-            result = dir_func(arg_num(tokens), tokens);
+            result = dir_func(arg_num(tokens), tokens, false, " ");
 
             ok = true;
             write(teava[1], &ok, sizeof(int));
@@ -641,7 +646,6 @@ bool interpretLine(char* buffer, char** tokens){
 }
 
 int numOfPipes(char** tokens){
-
 
     int i = 0, num = 0;
 
@@ -719,29 +723,112 @@ void parse(char* line, char** arg){
 
 }
 
-int spawnProc(int in, int out, char** args){
+void executePipeCommand(char** fragm_commands){
 
-    pid_t pid;
+    char* fileName;
+    char* mitu[arg_num(fragm_commands)];
 
-    if((pid = fork()) == 0){
+    int k;
 
-        if(in != 0){
+    bool isLess = false;
 
-            dup2(in, 0);
-            close(in);
+    for(k = 0; k < arg_num(fragm_commands); k++){
+
+        if(strcmp(fragm_commands[k], ">") == 0 ){
+
+            break;
         }
 
-        if(out != 1){
+        if(strcmp(fragm_commands[k], "<") == 0){
 
-            dup2(out, 1);
-            close(out);
+            isLess = true;
+
+            fileName = (char*)malloc(sizeof(char) * (strlen(fragm_commands[++k]) + 1));
+
+            fileName = fragm_commands[k];
+
+            k--;
+
+            break;
+
         }
 
-        return execvp(args[0], args);
+        mitu[k] = fragm_commands[k];
     }
 
-    return pid;
+    if(isLess == false){
 
+        fileName = (char*)malloc(sizeof(char)* 2);
+        fileName = " ";
+    }
+
+    mitu[k] = NULL;
+
+    if(strcmp(mitu[0], "-help") == 0 || strcmp(mitu[0], "exit") == 0){
+
+        printf("You can't pipe/redirect that buddy");
+        exit(0);
+    }
+
+    if(strcmp(mitu[0], "ls") == 0){
+
+        ls_func(arg_num(mitu), mitu);
+        exit(0);
+    }
+
+    if(strcmp(mitu[0], "tac") == 0){
+
+        //printf("\n%s", fileName);
+
+        tac_func(arg_num(mitu), mitu, isLess, fileName);
+        exit(0);
+    }
+
+    if(strcmp(mitu[0], "dirname") == 0){
+
+        dir_func(arg_num(mitu), mitu, isLess, fileName);
+        exit(0);
+    }
+
+    execvp(mitu[0], mitu);
+
+    perror("Something went wrong my dude");
+    abort();
+
+}
+
+void setRedir(char** fragm_commands){
+
+    for(int j = 0; j < arg_num(fragm_commands); j++){
+
+            if(strcmp(fragm_commands[j], ">") == 0){
+
+                int fd1 = creat(fragm_commands[++j], 0644);
+
+                if(fd1 < 0){
+
+                    perror("Can't open that file");
+                    exit(3);
+                }
+
+                dup2(fd1, STDOUT_FILENO);
+                close(fd1);
+            }
+
+            if(strcmp(fragm_commands[j], "<") == 0){
+
+                int fd2 = open(fragm_commands[++j], O_RDONLY);
+
+                if(fd2 < 0){
+
+                    perror("Can't open that file");
+                    exit(4);
+                }
+
+                dup2(fd2, STDIN_FILENO);
+                close(fd2);
+            }
+        }
 }
 
 int interpretPipeLine(char* buffer, char** tokens){
@@ -754,7 +841,6 @@ int interpretPipeLine(char* buffer, char** tokens){
     parseCommands(tokens, commands);
 
     /*handle the piping*/
-
     pid_t pid;
 
     pid = fork();
@@ -789,64 +875,10 @@ int interpretPipeLine(char* buffer, char** tokens){
                 fragm_commands[arg_num(fragm_commands)] = NULL;
 
                 //parse for redirects
-                for(int j = 0; j < arg_num(fragm_commands); j++){
 
-                    if(strcmp(fragm_commands[j], "<") == 0){
+                setRedir(fragm_commands);
 
-                        int fd = open(fragm_commands[++j], O_RDONLY);
-
-                        dup2(fd, STDIN_FILENO);
-                        close(fd);
-
-                    }
-
-                    if(strcmp(fragm_commands[j], ">") == 0){
-
-                        int fd1 = creat(fragm_commands[++j], 0644);
-
-                        dup2(fd1, STDOUT_FILENO);
-                        close(fd1);
-                    }
-                }
-
-                char* mitu[arg_num(fragm_commands)];
-
-                int k;
-
-                for(k = 0; k < arg_num(fragm_commands); k++){
-
-                    if(strcmp(fragm_commands[k], ">") == 0 || strcmp(fragm_commands[k], "<") == 0){
-
-                        break;
-                    }
-
-                    mitu[k] = fragm_commands[k];
-                }
-
-                mitu[k] = NULL;
-
-                if(strcmp(mitu[0], "ls") == 0){
-
-                    ls_func(arg_num(mitu), mitu);
-                    exit(0);
-                }
-
-                if(strcmp(mitu[0], "dirname") == 0){
-
-                    dir_func(arg_num(mitu), mitu);
-                    exit(0);
-                }
-
-                if(strcmp(mitu[0], "tac") == 0){
-
-                    dir_func(arg_num(mitu), mitu);
-                    exit(0);
-                }
-
-                execvp(mitu[0], mitu);
-
-                perror("Something went wrong my dude");
-                abort();
+                executePipeCommand(fragm_commands);
 
             }
 
@@ -860,76 +892,9 @@ int interpretPipeLine(char* buffer, char** tokens){
 
         fragm_commands[arg_num(fragm_commands)] = NULL;
 
-        for(int j = 0; j < arg_num(fragm_commands); j++){
+        setRedir(fragm_commands);
 
-                if(strcmp(fragm_commands[j], ">") == 0){
-
-                    int fd1 = creat(fragm_commands[++j], 0644);
-
-                    if(fd1 < 0){
-
-                        perror("Can't open that file");
-                        exit(3);
-                    }
-
-                    dup2(fd1, STDOUT_FILENO);
-                    close(fd1);
-                }
-
-                if(strcmp(fragm_commands[j], "<") == 0){
-
-                    int fd2 = open(fragm_commands[++j], O_RDONLY);
-
-                    if(fd2 < 0){
-
-                        perror("Can't open that file");
-                        exit(4);
-                    }
-
-                    dup2(fd2, STDIN_FILENO);
-                    close(fd2);
-                }
-        }
-
-        char* titu[arg_num(fragm_commands)];
-
-        int z;
-
-        for(z = 0; z < arg_num(fragm_commands); z++){
-
-            if(strcmp(fragm_commands[z], ">") == 0 || strcmp(fragm_commands[z], "<") == 0){
-
-                break;
-            }
-
-            titu[z] = fragm_commands[z];
-        }
-
-        titu[z] = NULL;
-
-        if(strcmp(titu[0], "ls") == 0){
-
-            ls_func(arg_num(titu), titu);
-            exit(0);
-        }
-
-        if(strcmp(titu[0], "dirname") == 0){
-
-            dir_func(arg_num(titu), titu);
-            exit(0);
-        }
-
-        if(strcmp(titu[0], "tac") == 0){
-
-            dir_func(arg_num(titu), titu);
-            exit(0);
-        }
-
-        execvp(titu[0], titu);
-
-        perror("Something went wrong my dude");
-        abort();
-
+        executePipeCommand(fragm_commands);
 
     }
 
